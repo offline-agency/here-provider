@@ -35,7 +35,7 @@ class IntegrationTest extends ProviderIntegrationTest
 
     protected function createProvider(ClientInterface $httpClient, bool $useCIT = false)
     {
-        return Here::createUsingApiKey($httpClient, $this->getApiKey(), $useCIT);
+        return Here::createUsingApiKey($httpClient, $this->getApiKey(), $useCIT, '6.2');
     }
 
     protected function getCacheDir(): string
@@ -66,7 +66,7 @@ class IntegrationTest extends ProviderIntegrationTest
 
     protected function getApiKey(): string
     {
-        return $_SERVER['HERE_APP_ID'];
+        return $_SERVER['HERE_API_KEY'] ?? 'missing';
     }
 
     protected function getAppId(): string
