@@ -157,6 +157,7 @@ final class Here extends AbstractHttpProvider implements Provider
 
     public function geocodeQuery(GeocodeQuery $query): Collection
     {
+
         // This API doesn't handle IPs
         if (filter_var($query->getText(), FILTER_VALIDATE_IP)) {
             throw new UnsupportedOperation('The Here provider does not support IP addresses, only street addresses.');
@@ -202,18 +203,30 @@ final class Here extends AbstractHttpProvider implements Provider
             'limit' => $query->getLimit(),
         ]);
 
+        // Pass-through for GS7 geo filters / sorting reference point.
+        // See https://www.here.com/docs/bundle/geocoding-and-search-api-v7-api-reference/page/index.html#/paths/~1geocode/get
+        if (null !== $at = $query->getData('at')) {
+            $queryParams['at'] = $at;
+        }
+        if (null !== $in = $query->getData('in')) {
+            $queryParams['in'] = $in;
+        }
+        if (null !== $types = $query->getData('types')) {
+            $queryParams['types'] = $types;
+        }
+
         $qq = [];
         if (null !== $country = $query->getData('country')) {
-            $qq[] = 'country='.$country;
+            $qq[] = 'country=' . $country;
         }
         if (null !== $state = $query->getData('state')) {
-            $qq[] = 'state='.$state;
+            $qq[] = 'state=' . $state;
         }
         if (null !== $county = $query->getData('county')) {
-            $qq[] = 'county='.$county;
+            $qq[] = 'county=' . $county;
         }
         if (null !== $city = $query->getData('city')) {
-            $qq[] = 'city='.$city;
+            $qq[] = 'city=' . $city;
         }
 
         if (!empty($qq)) {
@@ -303,6 +316,7 @@ final class Here extends AbstractHttpProvider implements Provider
 
     private function parseGS7Response(array $items, int $limit): Collection
     {
+
         $results = [];
 
         foreach ($items as $item) {
@@ -321,7 +335,9 @@ final class Here extends AbstractHttpProvider implements Provider
             $builder->setStreetName($address['street'] ?? null);
             $builder->setPostalCode($address['postalCode'] ?? null);
             $builder->setLocality($address['city'] ?? null);
-            $builder->setSubLocality($address['district'] ?? null);
+            // GS7 may provide both `district` and `subdistrict`. Prefer `district` for backward compatibility,
+            // but fall back to `subdistrict` when `district` is missing.
+            $builder->setSubLocality($address['district'] ?? ($address['subdistrict'] ?? null));
             $builder->setCountryCode($address['countryCode'] ?? null);
             $builder->setCountry($address['countryName'] ?? null);
 
@@ -332,14 +348,60 @@ final class Here extends AbstractHttpProvider implements Provider
             $hereAddress = $hereAddress->withLocationName($item['title'] ?? null);
 
             $additionalData = [];
+            if (isset($address['label'])) {
+                $additionalData[] = ['key' => 'Label', 'value' => $address['label']];
+            }
             if (isset($address['countryName'])) {
                 $additionalData[] = ['key' => 'CountryName', 'value' => $address['countryName']];
             }
             if (isset($address['state'])) {
                 $additionalData[] = ['key' => 'StateName', 'value' => $address['state']];
             }
+            if (isset($address['stateCode'])) {
+                $additionalData[] = ['key' => 'StateCode', 'value' => $address['stateCode']];
+            }
             if (isset($address['county'])) {
                 $additionalData[] = ['key' => 'CountyName', 'value' => $address['county']];
+            }
+            if (isset($address['countyCode'])) {
+                $additionalData[] = ['key' => 'CountyCode', 'value' => $address['countyCode']];
+            }
+            if (isset($address['district'])) {
+                $additionalData[] = ['key' => 'District', 'value' => $address['district']];
+            }
+            if (isset($address['subdistrict'])) {
+                $additionalData[] = ['key' => 'Subdistrict', 'value' => $address['subdistrict']];
+            }
+            if (isset($address['streets'])) {
+                $additionalData[] = ['key' => 'Streets', 'value' => $address['streets']];
+            }
+            if (isset($address['block'])) {
+                $additionalData[] = ['key' => 'Block', 'value' => $address['block']];
+            }
+            if (isset($address['subblock'])) {
+                $additionalData[] = ['key' => 'Subblock', 'value' => $address['subblock']];
+            }
+            if (isset($address['building'])) {
+                $additionalData[] = ['key' => 'Building', 'value' => $address['building']];
+            }
+            if (isset($address['unit'])) {
+                $additionalData[] = ['key' => 'Unit', 'value' => $address['unit']];
+            }
+
+            // Item metadata
+            foreach (
+                [
+                    'politicalView' => 'PoliticalView',
+                    'houseNumberType' => 'HouseNumberType',
+                    'addressBlockType' => 'AddressBlockType',
+                    'localityType' => 'LocalityType',
+                    'administrativeAreaType' => 'AdministrativeAreaType',
+                    'distance' => 'Distance',
+                ] as $sourceKey => $targetKey
+            ) {
+                if (isset($item[$sourceKey])) {
+                    $additionalData[] = ['key' => $targetKey, 'value' => $item[$sourceKey]];
+                }
             }
 
             $hereAddress = $hereAddress->withAdditionalData($additionalData);
