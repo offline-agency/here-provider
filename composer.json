@@ -12,9 +12,10 @@
         }
     ],
     "require": {
-        "php": "^8.2",
+        "php": "^8.1 || ^8.2",
         "geocoder-php/common-http": "^4.0",
-        "willdurand/geocoder": "^4.0|^5.0"
+        "willdurand/geocoder": "^4.0|^5.0",
+        "symfony/http-client": "^6.4"
     },
     "provide": {
         "geocoder-php/provider-implementation": "1.0"
@@ -41,5 +42,10 @@
     "scripts": {
         "test": "vendor/bin/phpunit",
         "test-ci": "vendor/bin/phpunit --coverage-text --coverage-clover=build/coverage.xml"
+    },
+    "config": {
+        "allow-plugins": {
+            "php-http/discovery": true
+        }
     }
 }
